@@ -1,0 +1,13 @@
+
+fastapi
+uvicorn[standard]
+groq
+python-dotenv
+pymupdf
+python-multipart
+langchain-text-splitters
+sentence-transformers
+numpy
+faiss-cpu
+rank-bm25
+python-docx

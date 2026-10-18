@@ -1,0 +1,398 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <meta name="description"
+        content="Chat Scholar academic AI assistant">
+  <title>Chat Scholar</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+
+<body>
+  <section
+  id="auth-screen"
+  class="auth-screen"
+  aria-labelledby="auth-title"
+  hidden
+>
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <div class="brand-icon">CS</div>
+      <h1 id="auth-title">Chat Scholar</h1>
+      <p>Sign in to your academic AI workspace</p>
+    </div>
+
+    <form id="login-form">
+
+      <label for="login-password">
+        Password
+      </label>
+
+      <input
+        id="login-password"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Enter your password"
+        minlength="1"
+        maxlength="1024"
+        required
+      >
+
+      <button
+        id="login-button"
+        type="submit"
+        class="button primary full"
+      >
+        Sign In
+      </button>
+
+    </form>
+
+    <p
+      id="login-error"
+      class="notification error hidden"
+      role="alert"
+      aria-live="polite"
+    ></p>
+
+    <p class="muted small">
+      Your documents, conversations, and grading reports
+      are available after authentication.
+    </p>
+
+  </div>
+</section>
+<div class="app-shell" style="display: none;">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon">CS</div>
+      <div>
+        <strong>Chat Scholar</strong>
+        <small>Academic AI Workspace</small>
+      </div>
+    </div>
+
+    <nav class="navigation" aria-label="Main navigation">
+      <button class="nav-button active"
+              data-view="chat">
+        <span>▣</span> PDF Chat
+      </button>
+      <button class="nav-button"
+              data-view="grading">
+        <span>▤</span> Essay Grading
+      </button>
+      <button class="nav-button"
+              data-view="saved">
+        <span>◷</span> Saved Work
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="status-dot"></span>
+      Local workspace
+      <small>Powered by FastAPI & Groq</small>
+    </div>
+  </aside>
+
+  <main class="main-content">
+
+    <header class="topbar">
+      <div>
+        <h1 id="page-title">Chat with PDF</h1>
+        <p id="page-subtitle">
+          Explore research papers with AI.
+        </p>
+      </div>
+      
+<div class="topbar-right">
+  <span class="model-pill">GPT-OSS 20B</span>
+
+  <!-- V11: Logout button -->
+  <button
+    id="logout-button"
+    type="button"
+    class="button secondary"
+    title="Sign out of Chat Scholar"
+  >
+    Logout
+  </button>
+</div>
+
+    </header>
+
+    <div id="notification"
+         class="notification hidden"
+         role="status"
+         aria-live="polite"></div>
+
+    <!-- PDF CHAT -->
+    <section id="view-chat" class="view active">
+
+      <div class="chat-layout">
+
+        <aside class="document-panel panel">
+          <h2>Research Documents</h2>
+          <p class="muted">
+            Upload a PDF to start a conversation.
+          </p>
+
+          <form id="pdf-upload-form">
+            <label class="upload-zone" for="pdf-file">
+              <span class="upload-icon">↑</span>
+              <strong>Choose PDF</strong>
+              <small>Maximum 20 MB</small>
+              <input id="pdf-file"
+                     type="file"
+                     accept=".pdf,application/pdf"
+                     required>
+            </label>
+
+            <button type="submit"
+                    class="button primary full">
+              Upload & Prepare
+            </button>
+          </form>
+
+          <div id="upload-status"
+               class="muted small"
+               role="status"></div>
+
+          <hr>
+
+          <label for="document-select">
+            Active document
+          </label>
+
+          <select id="document-select">
+            <option value="">Select document</option>
+          </select>
+
+          <button id="new-session-button"
+                  class="button secondary full"
+                  type="button">
+            + New Conversation
+          </button>
+
+          <h3>Recent conversations</h3>
+          <div id="recent-sessions"
+               class="session-list"></div>
+        </aside>
+
+        <section class="conversation-panel panel">
+
+          <div class="conversation-header">
+            <div>
+              <h2 id="chat-heading">
+                Academic Assistant
+              </h2>
+              <p id="chat-document-name" class="muted">
+                Select a PDF to begin.
+              </p>
+            </div>
+            <span id="chat-status"
+                  class="status-label">
+              Waiting
+            </span>
+          </div>
+
+          <div id="messages"
+               class="messages"
+               aria-live="polite">
+            <div class="empty-state">
+              <div class="empty-icon">✦</div>
+              <h3>Ask your research paper anything</h3>
+              <p>
+                Upload a PDF, then ask about methods,
+                results, conclusions, or definitions.
+              </p>
+            </div>
+          </div>
+
+          <form id="chat-form"
+                class="chat-composer">
+            <label class="sr-only" for="chat-input">
+              Your question
+            </label>
+            <textarea id="chat-input"
+                      rows="2"
+                      maxlength="5000"
+                      placeholder="Ask a question about your PDF..."
+                      required></textarea>
+            <button id="send-button"
+                    class="button primary"
+                    type="submit">
+              Send
+            </button>
+          </form>
+
+          <p class="composer-note">
+            Answers are AI-generated. Verify important
+            claims against the cited source passages.
+          </p>
+
+        </section>
+      </div>
+    </section>
+
+    <!-- ESSAY GRADING -->
+    <section id="view-grading" class="view">
+
+      <div class="page-grid">
+
+        <div class="panel">
+          <h2>1. Create Grading Rubric</h2>
+          <p class="muted">
+            Define criteria, maximum scores, and weights.
+            All weights must total 100%.
+          </p>
+
+          <form id="rubric-form">
+            <label for="rubric-title">Rubric title</label>
+            <input id="rubric-title"
+                   required
+                   maxlength="200"
+                   placeholder="Academic Essay Assessment">
+
+            <label for="rubric-instructions">
+              Instructor instructions
+            </label>
+            <textarea id="rubric-instructions"
+                      rows="3"
+                      maxlength="3000"
+                      placeholder="Assess only the submitted essay."></textarea>
+
+            <div class="section-heading">
+              <h3>Criteria</h3>
+              <button id="add-criterion"
+                      type="button"
+                      class="button secondary small-button">
+                + Add Criterion
+              </button>
+            </div>
+
+            <div id="criteria-list"></div>
+
+            <p id="weight-total" class="muted">
+              Total weight: 0%
+            </p>
+
+            <button class="button primary full"
+                    type="submit">
+              Save Rubric
+            </button>
+          </form>
+        </div>
+
+        <div class="panel">
+          <h2>2. Submit Essay</h2>
+
+          <label for="grading-rubric-select">
+            Select rubric
+          </label>
+          <select id="grading-rubric-select">
+            <option value="">Choose rubric</option>
+          </select>
+
+          <form id="essay-form">
+            <label for="essay-title">Essay title</label>
+            <input id="essay-title"
+                   maxlength="200"
+                   required
+                   placeholder="My Academic Essay">
+
+            <label for="essay-file">
+              Upload essay (optional)
+            </label>
+            <input id="essay-file"
+                   type="file"
+                   accept=".txt,.pdf,.docx">
+
+            <p class="muted small">
+              Upload TXT, PDF, DOCX (maximum 5 MB),
+              or paste text below.
+            </p>
+
+            <label for="essay-text">Essay text</label>
+            <textarea id="essay-text"
+                      rows="11"
+                      maxlength="18000"
+                      placeholder="Paste your essay here..."></textarea>
+
+            <button id="grade-button"
+                    class="button primary full"
+                    type="submit">
+              Grade Essay
+            </button>
+          </form>
+
+          <p class="muted small">
+            AI scores are formative estimates and
+            require human review.
+          </p>
+        </div>
+
+      </div>
+
+      <section id="grade-report"
+               class="panel report-panel hidden">
+        <h2>Grading Report</h2>
+        <div id="grade-report-content"></div>
+      </section>
+    </section>
+
+    <!-- SAVED WORK -->
+    <section id="view-saved" class="view">
+
+      <div class="page-grid">
+        <div class="panel">
+          <div class="section-heading">
+            <h2>Saved Conversations</h2>
+            <button id="refresh-sessions"
+                    type="button"
+                    class="button secondary small-button">
+              Refresh
+            </button>
+          </div>
+          <div id="saved-sessions"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Saved Grading Reports</h2>
+          <p class="muted">
+            Open reports created in this browser,
+            or enter a report ID.
+          </p>
+
+          <div id="saved-reports"></div>
+
+          <form id="open-grade-form">
+            <label for="grade-id-input">
+              Grading report UUID
+            </label>
+            <input id="grade-id-input"
+                   placeholder="Paste grade ID">
+            <button type="submit"
+                    class="button secondary full">
+              Open Report
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <section id="saved-report-detail"
+               class="panel report-panel hidden">
+        <h2>Saved Grading Report</h2>
+        <div id="saved-report-content"></div>
+      </section>
+    </section>
+
+  </main>
+</div>
+</body>
+</html>

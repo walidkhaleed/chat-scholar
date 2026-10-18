@@ -1,0 +1,51 @@
+﻿
+.env
+.venv/
+__pycache__/
+*.pyc
+uploads/
+extracted_text/
+chunks/
+embeddings/
+faiss_indexes/
+data/
+grading_data/
+
+# API keys and environment variables
+.env
+.env.*
+!.env.example
+
+# Python environments and cache
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Private academic documents and uploads
+uploads/
+uploaded_pdfs/
+grading_data/
+
+# Databases and vector indexes
+*.db
+*.sqlite
+*.sqlite3
+*.faiss
+*.index
+
+# Logs and temporary files
+*.log
+*.tmp
+temp/
+
+# IDE and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+
+# Local source backups
+*.bak
