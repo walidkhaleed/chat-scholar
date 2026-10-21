@@ -1,31 +1,24 @@
 ﻿
-.env
-.venv/
-__pycache__/
-*.pyc
-uploads/
-extracted_text/
-chunks/
-embeddings/
-faiss_indexes/
-data/
-grading_data/
-
-# API keys and environment variables
+# Environment variables and credentials
 .env
 .env.*
 !.env.example
 
-# Python environments and cache
+# Python environments and caches
 .venv/
 venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# Private academic documents and uploads
+# Uploaded documents and generated data
 uploads/
 uploaded_pdfs/
+extracted_text/
+chunks/
+embeddings/
+faiss_indexes/
+data/
 grading_data/
 
 # Databases and vector indexes
@@ -38,14 +31,16 @@ grading_data/
 # Logs and temporary files
 *.log
 *.tmp
+*.bak
 temp/
 
-# IDE and operating system
+# Local development probes and archives
+/probe_v12_*.py
+/smoke_v12_*.py
+*.zip
+
+# IDE and operating system files
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-
-
-# Local source backups
-*.bak
