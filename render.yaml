@@ -24,6 +24,10 @@ services:
       - key: CHAT_SCHOLAR_EMBEDDING_BACKEND
         value: onnx
 
+      # Restrict PDF processing on the free server.
+      - key: CHAT_SCHOLAR_PUBLIC_DEMO_LIMITS
+        value: "true"
+
       # Invalidate sessions after process restarts.
       - key: CHAT_SCHOLAR_EPHEMERAL_SESSIONS
         value: "true"

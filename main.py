@@ -115,6 +115,8 @@ from fastapi.staticfiles import StaticFiles
 from auth_routes import router as auth_router
 from auth_guard import authentication_guard
 from csrf_guard import csrf_guard
+
+from pdf_processor import PDFResourceLimitError
 # --------------------------------------------------
 # Configuration
 # --------------------------------------------------
@@ -124,7 +126,25 @@ logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
+# Stricter resource limits for public demo hosting.
+PUBLIC_DEMO_LIMITS = (
+    os.getenv(
+        "CHAT_SCHOLAR_PUBLIC_DEMO_LIMITS",
+        "false"
+    ).strip().lower() == "true"
+)
 
+PDF_UPLOAD_LIMIT = (
+    5 * 1024 * 1024
+    if PUBLIC_DEMO_LIMITS
+    else MAX_FILE_SIZE
+)
+
+PDF_PAGE_LIMIT = 30 if PUBLIC_DEMO_LIMITS else None
+
+PDF_TEXT_LIMIT = (
+    200_000 if PUBLIC_DEMO_LIMITS else None
+)
 
 
 
@@ -326,12 +346,15 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     try:
         # Read up to the maximum size plus one byte
-        content = await file.read(MAX_FILE_SIZE + 1)
+        content = await file.read(PDF_UPLOAD_LIMIT + 1)
 
-        if len(content) > MAX_FILE_SIZE:
+        if len(content) > PDF_UPLOAD_LIMIT:
             raise HTTPException(
                 status_code=413,
-                detail="PDF exceeds the 20 MB limit."
+                detail=(
+                    "PDF exceeds the "
+                    f"{PDF_UPLOAD_LIMIT // (1024 * 1024)} MB limit."
+                )
             )
 
         # Check the PDF file signature
@@ -345,7 +368,11 @@ async def upload_pdf(file: UploadFile = File(...)):
         pdf_path.write_bytes(content)
 
         # Extract text
-        extracted = extract_pdf_text(pdf_path)
+        extracted = extract_pdf_text(
+        pdf_path,
+        max_pages=PDF_PAGE_LIMIT,
+        max_characters=PDF_TEXT_LIMIT
+          )
 
         # Prepare document metadata
         document_data = {
@@ -372,6 +399,13 @@ async def upload_pdf(file: UploadFile = File(...)):
     except HTTPException:
         pdf_path.unlink(missing_ok=True)
         raise
+
+    except PDFResourceLimitError as e:
+        pdf_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=413,
+            detail=str(e)
+        ) from e
 
     except (ValueError, pymupdf.FileDataError) as e:
         pdf_path.unlink(missing_ok=True)
