@@ -125,8 +125,8 @@ The repository includes automated tests covering authentication, session securit
 Example regression commands:
 
 ```powershell
-python -m unittest discover -s . -p "test_v11*.py" -q
-python -m unittest discover -s . -p "test_v12*.py" -q
+python -m unittest discover -s tests -p "test_v11*.py" -q
+python -m unittest discover -s tests -p "test_v12*.py" -q
 ```
 
 Some integration tests require the corresponding embedding dependencies and environment configuration.
