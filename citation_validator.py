@@ -3,9 +3,9 @@ import re
 
 
 CITATION_PATTERN = re.compile(
-    r"\[S(\d+)\]"
+    r"(?:\[\s*S\s*(?P<square>\d+)\s*\]|"
+    r"【\s*S\s*(?P<corner>\d+)\s*】)"
 )
-
 NUMBER_PATTERN = re.compile(
     r"(?<![\w.])-?\d+(?:[.,]\d+)?%?(?!\w)"
 )
@@ -14,12 +14,14 @@ NUMBER_PATTERN = re.compile(
 def extract_citations(answer: str) -> list[str]:
     """
     Extract unique source IDs in order of appearance.
-    """
-    return list(dict.fromkeys(
-        f"S{number}"
-        for number in CITATION_PATTERN.findall(answer)
-    ))
 
+    Supports [S1], [S 1], 【S1】 and 【S 1】.
+    """
+
+    return list(dict.fromkeys(
+        f"S{match.group('square') or match.group('corner')}"
+        for match in CITATION_PATTERN.finditer(answer)
+    ))
 
 
 def split_answer_sentences(answer: str) -> list[str]:
@@ -29,7 +31,8 @@ def split_answer_sentences(answer: str) -> list[str]:
 
     # Convert "Sentence. [S1]" into "Sentence [S1]."
     normalized = re.sub(
-        r"([.!?])\s+(\[S\d+\])",
+        r"([.!?])\s+"
+        r"(\[\s*S\s*\d+\s*\]|【\s*S\s*\d+\s*】)",
         r" \2\1",
         answer
     )
