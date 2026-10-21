@@ -6,11 +6,14 @@ from pathlib import Path
 from uuid import UUID
 
 import numpy as np
-from sentence_transformers import SentenceTransformer
 
 from chunk_processor import load_chunks
-
-
+from embedding_backend import (
+    embed_question as backend_embed_question,
+    embed_documents as backend_embed_documents,
+    get_backend_name,
+    get_backend_model_id,
+)
 logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,7 +36,21 @@ def get_embedding_model():
     """
 
     logger.info("Loading embedding model: %s", MODEL_NAME)
+    @lru_cache(maxsize=1)
+    def get_embedding_model():
+        """
+        Load the original local embedding model only when needed.
+        """
+        from sentence_transformers import SentenceTransformer
 
+        logger.info("Loading embedding model: %s", MODEL_NAME)
+
+        model = SentenceTransformer(
+            MODEL_NAME,
+            device="cpu"
+        )
+
+        return model
     model = SentenceTransformer(
         MODEL_NAME,
         device="cpu"
@@ -70,33 +87,49 @@ def generate_embeddings(document_id: str) -> dict:
     texts = [chunk["text"] for chunk in chunks]
 
     # Load cached model
-    model = get_embedding_model()
 
-    # Check for input truncation
-    token_limit = model.max_seq_length
+    # V12: Preserve the original local token-length
+    # analysis, but avoid loading PyTorch on ONNX.
 
-    truncated_count = 0
+    # V12: Inspect token lengths with the selected backend.
+    if get_backend_name() == "local":
 
-    for text in texts:
-        token_count = len(
-            model.tokenizer(
-                text,
-                add_special_tokens=True,
-                truncation=False
-            )["input_ids"]
+        model = get_embedding_model()
+        token_limit = model.max_seq_length
+
+        truncated_count = 0
+
+        for text in texts:
+            token_count = len(
+                model.tokenizer(
+                    text,
+                    add_special_tokens=True,
+                    truncation=False
+                )["input_ids"]
+            )
+
+            if token_count > token_limit:
+                truncated_count += 1
+
+    else:
+        # ONNX: count tokens before truncation.
+        from render_embeddings import inspect_token_lengths
+
+        token_info = inspect_token_lengths(texts)
+
+        truncated_count = token_info["truncated_count"]
+
+        logger.info(
+            "ONNX embedding: %s chunks, %s exceed %s tokens",
+            len(texts),
+            truncated_count,
+            token_info["token_limit"],
         )
 
-        if token_count > token_limit:
-            truncated_count += 1
 
-    # Generate embeddings locally
-    vectors = model.encode(
-        texts,
-        batch_size=BATCH_SIZE,
-        show_progress_bar=False,
-        convert_to_numpy=True,
-        normalize_embeddings=True
-    )
+    # Generate embeddings with the selected backend.
+    vectors = backend_embed_documents(texts)
+
 
     # Store as float32 for FAISS compatibility
     vectors = np.asarray(vectors, dtype=np.float32)
@@ -119,7 +152,7 @@ def generate_embeddings(document_id: str) -> dict:
     metadata = {
         "document_id": document_id,
         "filename": chunk_data["filename"],
-        "model": MODEL_NAME,
+        "model": get_backend_model_id(),
         "embedding_dimension": int(vectors.shape[1]),
         "total_embeddings": int(vectors.shape[0]),
         "normalized": True,
@@ -156,7 +189,7 @@ def generate_embeddings(document_id: str) -> dict:
     return {
         "document_id": document_id,
         "filename": chunk_data["filename"],
-        "model": MODEL_NAME,
+        "model": get_backend_model_id(),
         "total_embeddings": int(vectors.shape[0]),
         "embedding_dimension": int(vectors.shape[1]),
         "truncated_chunks": truncated_count,
@@ -220,34 +253,34 @@ def load_embeddings(document_id: str) -> dict | None:
 
 def embed_query(question: str) -> np.ndarray:
     """
-    Convert a question into a normalized embedding.
-
-    This will be used by FAISS in V5.
+    Generate a normalized question embedding using
+    the configured embedding backend.
     """
-
-    if not question.strip():
+    if not isinstance(question, str) or not question.strip():
         raise ValueError("Question cannot be empty.")
 
-    model = get_embedding_model()
+    vector = backend_embed_question(question)
 
-    vector = model.encode(
-        question,
-        convert_to_numpy=True,
-        normalize_embeddings=True
-    )
+    vector = np.asarray(vector, dtype=np.float32)
 
-    return np.asarray(vector, dtype=np.float32)
+    if vector.shape != (384,):
+        raise RuntimeError(
+            "Unexpected query embedding dimensions."
+        )
+
+    return vector
+
 
 
 def check_embedding_lengths(document_id: str) -> dict:
     """
-    Check whether any V3 text chunks exceed the
-    embedding model's maximum input length.
+    Check PDF chunk token lengths using the active
+    embedding backend without generating embeddings.
 
-    Does not generate embeddings.
+    Supports:
+    - local: Sentence Transformers / PyTorch
+    - onnx: FastEmbed / ONNX Runtime
     """
-    from uuid import UUID
-
     document_id = str(UUID(document_id))
 
     chunk_data = load_chunks(document_id)
@@ -260,22 +293,39 @@ def check_embedding_lengths(document_id: str) -> dict:
     chunks = chunk_data["chunks"]
 
     if not chunks:
-        raise ValueError("Document has no extractable text chunks.")
+        raise ValueError(
+            "Document has no extractable text chunks."
+        )
 
-    model = get_embedding_model()
+    texts = [chunk["text"] for chunk in chunks]
 
-    limit = model.max_seq_length
+    if get_backend_name() == "onnx":
+        from render_embeddings import inspect_token_lengths
+
+        token_info = inspect_token_lengths(texts)
+
+        limit = token_info["token_limit"]
+        token_counts = token_info["token_counts"]
+
+    else:
+        # Preserve original local MiniLM implementation.
+        model = get_embedding_model()
+        limit = model.max_seq_length
+
+        token_counts = [
+            len(
+                model.tokenizer(
+                    text,
+                    add_special_tokens=True,
+                    truncation=False
+                )["input_ids"]
+            )
+            for text in texts
+        ]
+
     oversized = []
 
-    for chunk in chunks:
-        token_ids = model.tokenizer(
-            chunk["text"],
-            add_special_tokens=True,
-            truncation=False
-        )["input_ids"]
-
-        token_count = len(token_ids)
-
+    for chunk, token_count in zip(chunks, token_counts):
         if token_count > limit:
             oversized.append({
                 "chunk_id": chunk["chunk_id"],

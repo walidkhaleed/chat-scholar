@@ -1,0 +1,65 @@
+
+services:
+  - type: web
+    name: chat-scholar-portfolio
+    runtime: python
+    plan: free
+    region: frankfurt
+
+    branch: v12-render-portfolio
+    autoDeployTrigger: "off"
+
+    buildCommand: pip install -r requirements-render.txt
+
+    startCommand: python -m uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
+
+    healthCheckPath: /health
+
+    envVars:
+      # Match the Python version tested locally.
+      - key: PYTHON_VERSION
+        value: "3.13.14"
+
+      # Lightweight embedding backend.
+      - key: CHAT_SCHOLAR_EMBEDDING_BACKEND
+        value: onnx
+
+      # Invalidate sessions after process restarts.
+      - key: CHAT_SCHOLAR_EPHEMERAL_SESSIONS
+        value: "true"
+
+      # Production browser protections.
+      - key: CHAT_SCHOLAR_COOKIE_SECURE
+        value: "true"
+
+      - key: CHAT_SCHOLAR_CSRF_ENFORCE
+        value: "true"
+
+      # Use the actual Render hostname automatically.
+      - key: CHAT_SCHOLAR_ALLOWED_HOSTS
+        fromService:
+          type: web
+          name: chat-scholar-portfolio
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
+
+      # Use the actual HTTPS origin automatically.
+      - key: CHAT_SCHOLAR_ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: chat-scholar-portfolio
+          envVarKey: RENDER_EXTERNAL_URL
+
+      # Generate a separate secret for the deployment.
+      - key: CHAT_SCHOLAR_SESSION_SECRET
+        generateValue: true
+
+      # Provide these privately in Render later.
+      - key: CHAT_SCHOLAR_PASSWORD_HASH
+        sync: false
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      # Preserve the model used in your live test.
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b

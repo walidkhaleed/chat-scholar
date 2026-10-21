@@ -13,7 +13,9 @@ load_dotenv()
 
 SESSION_COOKIE_NAME = "chat_scholar_session"
 SESSION_DURATION_SECONDS = 8 * 60 * 60  # 8 hours
-
+# Randomized once per Python process.
+# Used for deployments with ephemeral storage.
+_PROCESS_SESSION_NONCE = secrets.token_bytes(32)
 
 def get_password_hash():
     password_hash = os.getenv(
@@ -28,6 +30,7 @@ def get_password_hash():
     return password_hash
 
 
+
 def get_session_secret():
     secret = os.getenv(
         "CHAT_SCHOLAR_SESSION_SECRET", ""
@@ -39,7 +42,26 @@ def get_session_secret():
             "or too short."
         )
 
-    return secret.encode("utf-8")
+    secret_bytes = secret.encode("utf-8")
+
+    # On ephemeral hosts, rotate the effective
+    # signing key whenever the process restarts.
+    ephemeral_mode = (
+        os.getenv(
+            "CHAT_SCHOLAR_EPHEMERAL_SESSIONS",
+            "false"
+        ).strip().lower() == "true"
+    )
+
+    if ephemeral_mode:
+        return hmac.new(
+            secret_bytes,
+            _PROCESS_SESSION_NONCE,
+            hashlib.sha256
+        ).digest()
+
+    # Preserve the existing local behavior.
+    return secret_bytes
 
 
 def verify_password(password: str) -> bool:

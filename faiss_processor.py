@@ -6,6 +6,7 @@ from uuid import UUID
 
 import faiss
 import numpy as np
+from embedding_backend import get_backend_model_id
 
 from embedding_processor import (
     EMBEDDING_DIR,
@@ -90,9 +91,11 @@ def load_source_data(document_id: str):
     if not np.isfinite(vectors).all():
         raise ValueError("Embeddings contain invalid values.")
 
-    if metadata["model"] != MODEL_NAME:
-        raise ValueError("Embedding model mismatch.")
-
+    if metadata.get("model") != get_backend_model_id():
+        raise ValueError(
+            "Embedding backend mismatch. "
+            "Regenerate embeddings with the active backend."
+        )
     if metadata.get("total_embeddings") != len(vectors):
         raise ValueError("Embedding count mismatch.")
 
@@ -204,6 +207,13 @@ def load_faiss_index(document_id: str):
     ) as file:
         info = json.load(file)
 
+    # V12: Reject indexes created by a different
+# embedding backend, even if dimensions match.
+    if info.get("model") != get_backend_model_id():
+        raise ValueError(
+            "FAISS index embedding backend mismatch. "
+            "Rebuild the index using the active backend."
+        )
     fingerprints = {
         "vectors_sha256": "vectors",
         "metadata_sha256": "metadata",

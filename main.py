@@ -2,7 +2,8 @@
 import logging
 from pathlib import Path
 from uuid import uuid4
-
+import os
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -134,12 +135,41 @@ app = FastAPI(
     title="Chat Scholar API",
     description="Academic AI Assistant with RAG and Essay Grading",
     version="9.0.0"
-    
 )
 
 app.include_router(auth_router)
 app.middleware("http")(authentication_guard)
 app.middleware("http")(csrf_guard)
+
+
+# --------------------------------------------------
+# Trusted Host Security
+# --------------------------------------------------
+
+# Local development hosts are the default.
+# Override with CHAT_SCHOLAR_ALLOWED_HOSTS
+# when deploying behind a real domain.
+allowed_hosts = [
+    host.strip()
+    for host in os.getenv(
+        "CHAT_SCHOLAR_ALLOWED_HOSTS",
+        "127.0.0.1,localhost,testserver"
+    ).split(",")
+    if host.strip()
+]
+
+# Never allow an empty configuration or a
+# wildcard that accepts every hostname.
+if not allowed_hosts or "*" in allowed_hosts:
+    raise RuntimeError(
+        "Invalid CHAT_SCHOLAR_ALLOWED_HOSTS configuration."
+    )
+
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=allowed_hosts,
+    www_redirect=False
+)
 
 # --------------------------------------------------
 # Pydantic models

@@ -1,0 +1,13 @@
+
+fastapi
+uvicorn
+groq
+python-dotenv
+pymupdf
+python-multipart
+langchain-text-splitters
+fastembed
+numpy
+faiss-cpu
+rank-bm25
+python-docx
